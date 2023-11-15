@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  base:
+    build:
+      context: .
+    image: app
+    container_name: "${PREFIX_CONTAINER}base"
+    volumes:
+      - ${PWD}:/app
+    env_file: .env
+    environment:
+      - APP_NAME=app
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=INFO
+      - PYTHONDONTWRITEBYTECODE=true
+      - PYTHONUNBUFFERED=true
+      - VIRTUAL_HOST=chat.docker
+    command: ["echo", "I only exist to be extended so I'll just exit, thanks"]
+    logging:
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  app:
+    extends: base
+    container_name: "${PREFIX_CONTAINER}app"
+    command:
+      - /bin/bash
+      - -c
+      - |
+        uvicorn --reload --workers 1 --host 0.0.0.0 --port 80 app.main:app --no-server-header
+    ports:
+      - ${APP_FORWARD_PORT}:80
+    depends_on:
+      - redis
+    logging:
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  app-test:
+    extends: base
+    container_name: "${PREFIX_CONTAINER}app-test"
+    depends_on:
+      redis:
+        condition: service_started
+    command:
+      - /bin/bash
+      - -c
+      - |
+        pip install -r requirements-dev.txt
+        python -m pytest
+    logging:
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  redis:
+    container_name: "${PREFIX_CONTAINER}redis"
+    image: redis:7.2.3
+    logging:
+      options:
+        max-size: "200k"
+        max-file: "10"
